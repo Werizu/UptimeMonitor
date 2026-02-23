@@ -1,0 +1,18 @@
+{
+  "pushover": {
+    "user_key": "YOUR_PUSHOVER_USER_KEY",
+    "api_token": "YOUR_PUSHOVER_API_TOKEN"
+  },
+  "defaults": {
+    "check_interval": 300,
+    "timeout": 10,
+    "expected_status": 200
+  },
+  "sites": [
+    {
+      "name": "My Website",
+      "url": "https://example.com",
+      "check_interval": 300
+    }
+  ]
+}
