@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uptime Monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: #0f1117;
+            color: #e0e0e0;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 2rem;
+            color: #fff;
+        }
+        h2 {
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin: 2rem 0 1rem;
+            color: #aaa;
+        }
+        .site-card {
+            background: #1a1d27;
+            border-radius: 8px;
+            padding: 1.2rem 1.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .badge {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .badge.up { background: #22c55e; box-shadow: 0 0 8px #22c55e66; }
+        .badge.down { background: #ef4444; box-shadow: 0 0 8px #ef444466; }
+        .badge.unknown { background: #666; }
+        .site-name {
+            font-weight: 600;
+            color: #fff;
+            min-width: 140px;
+        }
+        .site-url {
+            color: #666;
+            font-size: 0.85rem;
+            flex: 1;
+        }
+        .site-meta {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.85rem;
+        }
+        .site-meta span { color: #888; }
+        .site-meta .value { color: #ccc; font-weight: 500; }
+        .uptime-good { color: #22c55e !important; }
+        .uptime-warn { color: #f59e0b !important; }
+        .uptime-bad { color: #ef4444 !important; }
+        .chart-container {
+            background: #1a1d27;
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin-bottom: 1rem;
+        }
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.8rem;
+        }
+        .chart-title { font-size: 0.9rem; color: #aaa; }
+        .chart-range {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .chart-range button {
+            background: #252830;
+            border: none;
+            color: #888;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+        .chart-range button.active {
+            background: #3b82f6;
+            color: #fff;
+        }
+        canvas { max-height: 200px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        th {
+            text-align: left;
+            padding: 0.6rem 1rem;
+            color: #666;
+            font-weight: 500;
+            border-bottom: 1px solid #252830;
+        }
+        td {
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid #1a1d27;
+        }
+        .event-down { color: #ef4444; }
+        .event-up { color: #22c55e; }
+        .last-update {
+            text-align: right;
+            font-size: 0.75rem;
+            color: #444;
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>Uptime Monitor</h1>
+
+    <div id="sites"></div>
+
+    <h2>Response Times</h2>
+    <div id="charts"></div>
+
+    <h2>Recent Events</h2>
+    <table>
+        <thead>
+            <tr><th>Site</th><th>Event</th><th>Started</th><th>Ended</th><th>Duration</th></tr>
+        </thead>
+        <tbody id="events"></tbody>
+    </table>
+
+    <div class="last-update" id="last-update"></div>
+
+    <script>
+        const charts = {};
+        const siteConfigs = {{ sites | tojson }};
+
+        function uptimeClass(val) {
+            if (val >= 99.9) return 'uptime-good';
+            if (val >= 99) return 'uptime-warn';
+            return 'uptime-bad';
+        }
+
+        function formatDuration(sec) {
+            if (!sec) return '—';
+            if (sec < 60) return Math.round(sec) + 's';
+            if (sec < 3600) return Math.round(sec / 60) + 'min';
+            return (sec / 3600).toFixed(1) + 'h';
+        }
+
+        function formatTime(ts) {
+            if (!ts) return '—';
+            const d = new Date(ts + 'Z');
+            return d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        }
+
+        async function loadStatus() {
+            const resp = await fetch('/api/status');
+            const data = await resp.json();
+            const container = document.getElementById('sites');
+            container.innerHTML = data.map(s => `
+                <div class="site-card">
+                    <div class="badge ${s.is_up === true ? 'up' : s.is_up === false ? 'down' : 'unknown'}"></div>
+                    <div class="site-name">${s.name}</div>
+                    <div class="site-url">${s.url}</div>
+                    <div class="site-meta">
+                        <span>${s.response_time_ms != null ? `<span class="value">${Math.round(s.response_time_ms)}ms</span>` : '—'}</span>
+                        <span>24h <span class="value ${uptimeClass(s.uptime_24h)}">${s.uptime_24h}%</span></span>
+                        <span>7d <span class="value ${uptimeClass(s.uptime_7d)}">${s.uptime_7d}%</span></span>
+                        <span>30d <span class="value ${uptimeClass(s.uptime_30d)}">${s.uptime_30d}%</span></span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function loadChart(url, name, hours) {
+            const resp = await fetch(`/api/response-times/${encodeURIComponent(url)}?hours=${hours}`);
+            const data = await resp.json();
+            const id = 'chart-' + btoa(url).replace(/[^a-zA-Z0-9]/g, '');
+
+            let container = document.getElementById(id);
+            if (!container) {
+                container = document.createElement('div');
+                container.className = 'chart-container';
+                container.id = id;
+                container.innerHTML = `
+                    <div class="chart-header">
+                        <span class="chart-title">${name}</span>
+                        <div class="chart-range">
+                            <button data-h="6" onclick="switchRange('${url}','${name}',6,this)">6h</button>
+                            <button data-h="24" class="active" onclick="switchRange('${url}','${name}',24,this)">24h</button>
+                            <button data-h="168" onclick="switchRange('${url}','${name}',168,this)">7d</button>
+                        </div>
+                    </div>
+                    <canvas></canvas>
+                `;
+                document.getElementById('charts').appendChild(container);
+            }
+
+            const canvas = container.querySelector('canvas');
+            if (charts[url]) charts[url].destroy();
+
+            charts[url] = new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => formatTime(d.time)),
+                    datasets: [{
+                        data: data.map(d => d.ms),
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59,130,246,0.1)',
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        fill: true,
+                        tension: 0.3,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: {
+                            ticks: { color: '#444', maxTicksLimit: 8, font: { size: 10 } },
+                            grid: { color: '#1f2130' },
+                        },
+                        y: {
+                            ticks: { color: '#444', callback: v => v + 'ms', font: { size: 10 } },
+                            grid: { color: '#1f2130' },
+                            beginAtZero: true,
+                        }
+                    }
+                }
+            });
+        }
+
+        function switchRange(url, name, hours, btn) {
+            btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            loadChart(url, name, hours);
+        }
+
+        async function loadEvents() {
+            const resp = await fetch('/api/events?limit=20');
+            const data = await resp.json();
+            document.getElementById('events').innerHTML = data.map(e => `
+                <tr>
+                    <td>${e.site_url}</td>
+                    <td class="${e.event_type === 'DOWN' ? 'event-down' : 'event-up'}">${e.event_type}</td>
+                    <td>${formatTime(e.started_at)}</td>
+                    <td>${formatTime(e.ended_at)}</td>
+                    <td>${formatDuration(e.duration_seconds)}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function refresh() {
+            await loadStatus();
+            for (const s of siteConfigs) {
+                await loadChart(s.url, s.name || s.url, 24);
+            }
+            await loadEvents();
+            document.getElementById('last-update').textContent = 'Updated: ' + new Date().toLocaleTimeString('de-DE');
+        }
+
+        refresh();
+        setInterval(refresh, 60000);
+    </script>
+</body>
+</html>
