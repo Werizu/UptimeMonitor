@@ -1,0 +1,23 @@
+{
+  "pushover": {
+    "user_key": "ua88tdweg7jm8pdkjtrh7amyz646a4",
+    "api_token": "ak5rkknekea2ivvxd84vud26znu73j"
+  },
+  "defaults": {
+    "check_interval": 300,
+    "timeout": 10,
+    "expected_status": 200
+  },
+  "sites": [
+    {
+      "name": "GameZone",
+      "url": "https://heckserver.de",
+      "check_interval": 300
+    },
+    {
+      "name": "Portfolio",
+      "url": "https://marlonheck.de",
+      "check_interval": 300
+    }
+  ]
+}
