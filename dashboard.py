@@ -59,6 +59,12 @@ def api_events():
     return jsonify(events)
 
 
+@app.after_request
+def cors(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    return response
+
+
 if __name__ == "__main__":
     database.init_db()
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

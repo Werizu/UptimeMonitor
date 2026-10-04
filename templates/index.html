@@ -175,9 +175,9 @@
                     <div class="site-url">${s.url}</div>
                     <div class="site-meta">
                         <span>${s.response_time_ms != null ? `<span class="value">${Math.round(s.response_time_ms)}ms</span>` : '—'}</span>
-                        <span>24h <span class="value ${uptimeClass(s.uptime_24h)}">${s.uptime_24h}%</span></span>
-                        <span>7d <span class="value ${uptimeClass(s.uptime_7d)}">${s.uptime_7d}%</span></span>
-                        <span>30d <span class="value ${uptimeClass(s.uptime_30d)}">${s.uptime_30d}%</span></span>
+                        <span>24h <span class="value ${s.uptime_24h != null ? uptimeClass(s.uptime_24h) : ''}">${s.uptime_24h != null ? s.uptime_24h + '%' : '—'}</span></span>
+                        <span>7d <span class="value ${s.uptime_7d != null ? uptimeClass(s.uptime_7d) : ''}">${s.uptime_7d != null ? s.uptime_7d + '%' : '—'}</span></span>
+                        <span>30d <span class="value ${s.uptime_30d != null ? uptimeClass(s.uptime_30d) : ''}">${s.uptime_30d != null ? s.uptime_30d + '%' : '—'}</span></span>
                     </div>
                 </div>
             `).join('');

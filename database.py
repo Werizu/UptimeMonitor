@@ -83,7 +83,7 @@ def get_uptime_percent(url, hours=24):
     ).fetchone()
     conn.close()
     if not row or row["total"] == 0:
-        return 100.0
+        return None
     return round((row["up_count"] / row["total"]) * 100, 2)
 
 
